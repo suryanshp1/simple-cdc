@@ -1,0 +1,75 @@
+services:
+
+  postgres:
+    build: ./postgres
+    container_name: simplecdc-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - pgdata:/var/lib/postgresql/data
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=4
+      - -c
+      - max_wal_senders=4
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-app}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  cdc-worker:
+    build: ./cdc-worker
+    container_name: simplecdc-worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-admin}
+      DB_PASSWORD: ${DB_PASSWORD:-admin}
+      DB_NAME: ${DB_NAME:-app}
+      SLOT_NAME: ${SLOT_NAME:-simplecdc_slot}
+      PUBLICATION_NAME: ${PUBLICATION_NAME:-simplecdc_pub}
+      POLL_INTERVAL: ${POLL_INTERVAL:-0.1}
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: simplecdc-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-admin}
+      DB_PASSWORD: ${DB_PASSWORD:-admin}
+      DB_NAME: ${DB_NAME:-app}
+      API_TOKEN: ${API_TOKEN:-changeme}
+
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: simplecdc-frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
