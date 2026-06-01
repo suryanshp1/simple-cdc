@@ -2,6 +2,10 @@
 
 **Real-time Change Data Capture for PostgreSQL**
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)
+[![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg?style=flat-square)](CODE_OF_CONDUCT.md)
+
 SimpleCDC is a lightweight CDC platform that monitors PostgreSQL database changes in real time and streams them to a web dashboard. Built for developers who need visibility into database mutations without the complexity of Kafka, Debezium, or heavy infrastructure.
 
 ![Stack](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat-square&logo=postgresql)
@@ -14,24 +18,34 @@ SimpleCDC is a lightweight CDC platform that monitors PostgreSQL database change
 
 ## Architecture
 
-```text
-┌─────────────────┐
-│   PostgreSQL 16  │
-│  WAL + Logical   │
-│  Replication     │
-└────────┬────────┘
-         │  pg_logical_slot_get_changes()
-         ▼
-┌─────────────────┐     NOTIFY/LISTEN     ┌─────────────────┐
-│  CDC Worker      │ ──────────────────▶  │  FastAPI Backend │
-│  (Python)        │                       │  REST + WebSocket│
-└─────────────────┘                       └────────┬────────┘
-                                                    │  WebSocket
-                                                    ▼
-                                          ┌─────────────────┐
-                                          │  React Dashboard │
-                                          │  Live Event Feed │
-                                          └─────────────────┘
+```mermaid
+flowchart TD
+    subgraph Database
+        PG[(PostgreSQL 16<br/>WAL + Logical Replication)]
+    end
+
+    subgraph Backend
+        Worker(CDC Worker<br/>Python)
+        API{FastAPI Backend<br/>REST + WebSocket}
+    end
+
+    subgraph Frontend
+        Dashboard[React Dashboard<br/>Live Event Feed]
+    end
+
+    PG -- "pg_logical_slot_get_changes()" --> Worker
+    Worker -- "NOTIFY/LISTEN" --> API
+    API -- "WebSocket" --> Dashboard
+
+    classDef db fill:#336791,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef worker fill:#3776AB,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef api fill:#009688,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef ui fill:#61DAFB,stroke:#fff,stroke-width:2px,color:#333;
+
+    class PG db;
+    class Worker worker;
+    class API api;
+    class Dashboard ui;
 ```
 
 **Flow:** PostgreSQL WAL → CDC Worker polls via `wal2json` → Stores in `cdc_events` → Sends `NOTIFY` → Backend listens → Broadcasts via WebSocket → Dashboard updates live.
@@ -220,6 +234,14 @@ docker compose up --build
 
 ---
 
+## Contributing
+
+Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to get started, and our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) to understand the expectations we have for our community.
+
+---
+
 ## License
 
-MIT
+Distributed under the MIT License. See `LICENSE` for more information.
